@@ -1,0 +1,1425 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#090a0e">
+  <title>Neon Rush</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #f8fafc;
+      --muted: #a8b3c3;
+      --panel: rgba(9, 12, 17, 0.66);
+      --panel-strong: rgba(8, 10, 14, 0.86);
+      --line: rgba(255, 255, 255, 0.16);
+      --cyan: #31d4ff;
+      --gold: #ffd34f;
+      --coral: #ff5d6c;
+      --lime: #7dff8a;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #090a0e;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      touch-action: none;
+      overscroll-behavior: none;
+    }
+
+    button {
+      font: inherit;
+      color: inherit;
+    }
+
+    #game {
+      position: fixed;
+      inset: 0;
+      min-width: 100vw;
+      min-height: 100vh;
+      background: #08090c;
+    }
+
+    #hud {
+      position: fixed;
+      top: max(12px, env(safe-area-inset-top));
+      left: max(12px, env(safe-area-inset-left));
+      right: max(12px, env(safe-area-inset-right));
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: start;
+      gap: 10px;
+      pointer-events: none;
+      z-index: 3;
+    }
+
+    .stack {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .chip {
+      min-width: 78px;
+      padding: 7px 9px 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      backdrop-filter: blur(12px);
+    }
+
+    .chip small {
+      display: block;
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1;
+      text-transform: uppercase;
+      letter-spacing: 0;
+      margin-bottom: 4px;
+    }
+
+    .chip strong {
+      display: block;
+      min-height: 22px;
+      font-size: clamp(18px, 5vw, 25px);
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    #comboChip {
+      color: var(--gold);
+      opacity: 0;
+      transform: translateY(-6px);
+      transition: opacity 140ms ease, transform 140ms ease;
+    }
+
+    #comboChip.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .pause-button {
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 50%;
+      background: var(--panel);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+      backdrop-filter: blur(12px);
+      pointer-events: auto;
+    }
+
+    .pause-button svg,
+    .boost-button svg {
+      width: 21px;
+      height: 21px;
+      display: block;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2.5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    #boostWrap {
+      position: fixed;
+      right: max(15px, env(safe-area-inset-right));
+      bottom: max(18px, env(safe-area-inset-bottom));
+      z-index: 4;
+      pointer-events: none;
+    }
+
+    .boost-button {
+      width: clamp(68px, 18vw, 84px);
+      height: clamp(68px, 18vw, 84px);
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(255, 211, 79, 0.5);
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 50% 50%, rgba(255, 211, 79, 0.24), transparent 45%),
+        conic-gradient(var(--gold) calc(var(--boost, 0) * 1turn), rgba(255, 255, 255, 0.12) 0);
+      box-shadow: 0 16px 38px rgba(0, 0, 0, 0.34), 0 0 22px rgba(255, 211, 79, 0.24);
+      color: #fff6ca;
+      pointer-events: auto;
+      transform: translateZ(0);
+    }
+
+    .boost-button::before {
+      content: "";
+      position: absolute;
+      inset: 7px;
+      border-radius: inherit;
+      background: rgba(10, 12, 16, 0.82);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+    }
+
+    .boost-button svg {
+      position: relative;
+      width: 30px;
+      height: 30px;
+      color: var(--gold);
+      filter: drop-shadow(0 0 10px rgba(255, 211, 79, 0.5));
+    }
+
+    .boost-button:active {
+      transform: scale(0.96);
+    }
+
+    .boost-button[disabled] {
+      border-color: rgba(255, 255, 255, 0.14);
+      color: rgba(255, 255, 255, 0.46);
+      box-shadow: 0 12px 26px rgba(0, 0, 0, 0.26);
+    }
+
+    .boost-button[disabled] svg {
+      color: rgba(255, 255, 255, 0.45);
+      filter: none;
+    }
+
+    .screen {
+      position: fixed;
+      inset: 0;
+      z-index: 5;
+      display: grid;
+      place-items: center;
+      padding: max(22px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) max(22px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
+      background:
+        linear-gradient(180deg, rgba(5, 7, 10, 0.18), rgba(5, 7, 10, 0.74)),
+        radial-gradient(circle at 50% 72%, rgba(49, 212, 255, 0.16), transparent 36%);
+      opacity: 1;
+      visibility: visible;
+      transition: opacity 180ms ease, visibility 180ms ease;
+    }
+
+    .screen.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .modal {
+      width: min(430px, 100%);
+      padding: clamp(22px, 7vw, 34px);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 8px;
+      background: var(--panel-strong);
+      box-shadow: 0 30px 100px rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(20px);
+      text-align: center;
+    }
+
+    .logo {
+      margin: 0 0 10px;
+      font-size: clamp(43px, 15vw, 76px);
+      line-height: 0.92;
+      font-weight: 950;
+      letter-spacing: 0;
+      text-transform: uppercase;
+      text-shadow:
+        0 0 18px rgba(49, 212, 255, 0.46),
+        0 4px 0 rgba(255, 93, 108, 0.38);
+    }
+
+    .tagline {
+      margin: 0 0 22px;
+      color: var(--muted);
+      font-size: clamp(14px, 4.4vw, 17px);
+      line-height: 1.35;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin: 0 0 22px;
+    }
+
+    .stat {
+      min-width: 0;
+      padding: 10px 7px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .stat small {
+      display: block;
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1;
+      text-transform: uppercase;
+      letter-spacing: 0;
+      margin-bottom: 5px;
+    }
+
+    .stat strong {
+      display: block;
+      min-height: 21px;
+      font-size: clamp(18px, 5vw, 23px);
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .primary {
+      width: 100%;
+      min-height: 54px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      border: 0;
+      border-radius: 8px;
+      background: linear-gradient(135deg, var(--cyan), #56f0b1 55%, var(--gold));
+      color: #071015;
+      box-shadow: 0 14px 36px rgba(49, 212, 255, 0.28);
+      font-size: 18px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0;
+    }
+
+    .primary svg {
+      width: 22px;
+      height: 22px;
+      fill: currentColor;
+    }
+
+    .primary:active {
+      transform: translateY(1px);
+    }
+
+    .mini-actions {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .ghost {
+      min-width: 52px;
+      min-height: 42px;
+      display: inline-grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--ink);
+    }
+
+    .ghost svg {
+      width: 20px;
+      height: 20px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2.2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .flash {
+      position: fixed;
+      inset: 0;
+      z-index: 2;
+      background: rgba(255, 255, 255, 0.6);
+      pointer-events: none;
+      opacity: 0;
+      mix-blend-mode: screen;
+      transition: opacity 160ms ease;
+    }
+
+    .flash.on {
+      opacity: 0.28;
+      transition: opacity 30ms ease;
+    }
+
+    @media (max-width: 390px) {
+      .chip {
+        min-width: 68px;
+        padding-inline: 7px;
+      }
+
+      .stats {
+        gap: 6px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .screen,
+      #comboChip,
+      .flash {
+        transition: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game" aria-label="Neon Rush racing game"></canvas>
+
+  <div id="hud" aria-live="polite">
+    <div class="stack">
+      <div class="chip">
+        <small>Score</small>
+        <strong id="scoreText">0</strong>
+      </div>
+      <div class="chip">
+        <small>Best</small>
+        <strong id="bestText">0</strong>
+      </div>
+      <div class="chip" id="comboChip">
+        <small>Combo</small>
+        <strong id="comboText">x1</strong>
+      </div>
+    </div>
+    <button class="pause-button" id="pauseButton" type="button" aria-label="Pause">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg>
+    </button>
+  </div>
+
+  <div id="boostWrap">
+    <button class="boost-button" id="boostButton" type="button" aria-label="Boost" disabled>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 10-13h-7l1-7z"/></svg>
+    </button>
+  </div>
+
+  <div class="flash" id="flash"></div>
+
+  <section class="screen" id="startScreen">
+    <div class="modal">
+      <h1 class="logo">Neon Rush</h1>
+      <p class="tagline">Midnight Circuit</p>
+      <div class="stats">
+        <div class="stat">
+          <small>Best</small>
+          <strong id="menuBest">0</strong>
+        </div>
+        <div class="stat">
+          <small>Coins</small>
+          <strong id="menuCoins">0</strong>
+        </div>
+        <div class="stat">
+          <small>Rush</small>
+          <strong id="menuRush">x1</strong>
+        </div>
+      </div>
+      <button class="primary" id="startButton" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+        Start
+      </button>
+      <div class="mini-actions">
+        <button class="ghost" id="soundButton" type="button" aria-label="Sound on">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4h4l5 5V5l-5 5H4z"/><path d="M16 9c1 .9 1.5 1.9 1.5 3s-.5 2.1-1.5 3"/><path d="M18.5 6.5A7.5 7.5 0 0 1 21 12a7.5 7.5 0 0 1-2.5 5.5"/></svg>
+        </button>
+        <button class="ghost" id="resetButton" type="button" aria-label="Reset best score">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v6h6"/></svg>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen hidden" id="pauseScreen">
+    <div class="modal">
+      <h2 class="logo">Paused</h2>
+      <div class="stats">
+        <div class="stat">
+          <small>Score</small>
+          <strong id="pauseScore">0</strong>
+        </div>
+        <div class="stat">
+          <small>Best</small>
+          <strong id="pauseBest">0</strong>
+        </div>
+        <div class="stat">
+          <small>Coins</small>
+          <strong id="pauseCoins">0</strong>
+        </div>
+      </div>
+      <button class="primary" id="resumeButton" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+        Resume
+      </button>
+    </div>
+  </section>
+
+  <section class="screen hidden" id="endScreen">
+    <div class="modal">
+      <h2 class="logo">Crash</h2>
+      <div class="stats">
+        <div class="stat">
+          <small>Score</small>
+          <strong id="finalScore">0</strong>
+        </div>
+        <div class="stat">
+          <small>Best</small>
+          <strong id="finalBest">0</strong>
+        </div>
+        <div class="stat">
+          <small>Coins</small>
+          <strong id="finalCoins">0</strong>
+        </div>
+      </div>
+      <button class="primary" id="restartButton" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v7h-7"/></svg>
+        Again
+      </button>
+    </div>
+  </section>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const canvas = document.getElementById("game");
+      const ctx = canvas.getContext("2d", { alpha: false });
+      const scoreText = document.getElementById("scoreText");
+      const bestText = document.getElementById("bestText");
+      const comboChip = document.getElementById("comboChip");
+      const comboText = document.getElementById("comboText");
+      const boostButton = document.getElementById("boostButton");
+      const pauseButton = document.getElementById("pauseButton");
+      const startScreen = document.getElementById("startScreen");
+      const pauseScreen = document.getElementById("pauseScreen");
+      const endScreen = document.getElementById("endScreen");
+      const startButton = document.getElementById("startButton");
+      const restartButton = document.getElementById("restartButton");
+      const resumeButton = document.getElementById("resumeButton");
+      const soundButton = document.getElementById("soundButton");
+      const resetButton = document.getElementById("resetButton");
+      const flash = document.getElementById("flash");
+      const menuBest = document.getElementById("menuBest");
+      const menuCoins = document.getElementById("menuCoins");
+      const menuRush = document.getElementById("menuRush");
+      const pauseScore = document.getElementById("pauseScore");
+      const pauseBest = document.getElementById("pauseBest");
+      const pauseCoins = document.getElementById("pauseCoins");
+      const finalScore = document.getElementById("finalScore");
+      const finalBest = document.getElementById("finalBest");
+      const finalCoins = document.getElementById("finalCoins");
+
+      const storeKey = "neonRush.best.v1";
+      const mutedKey = "neonRush.muted.v1";
+      const laneSlots = [-0.68, 0, 0.68];
+      const carColors = ["#31d4ff", "#ff5d6c", "#ffd34f", "#7dff8a", "#f8fafc", "#b687ff"];
+      const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+      const lerp = (a, b, t) => a + (b - a) * t;
+      const ease = (t) => t * t * (3 - 2 * t);
+      const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      let width = 1;
+      let height = 1;
+      let dpr = 1;
+      let audio;
+      let muted = localStorage.getItem(mutedKey) === "true";
+      let best = Number(localStorage.getItem(storeKey) || 0);
+      let animationId = 0;
+      let lastTime = 0;
+      let state = makeInitialState("ready");
+      let skyline = [];
+
+      function makeInitialState(mode) {
+        return {
+          mode,
+          distance: 0,
+          score: 0,
+          coins: 0,
+          combo: 1,
+          comboClock: 0,
+          speed: 640,
+          roadPulse: 0,
+          boost: 0.18,
+          boostHeld: false,
+          boostFlash: 0,
+          shake: 0,
+          player: {
+            lane: 0,
+            target: 0,
+            lean: 0,
+            keyboard: 0,
+            offroad: 0
+          },
+          trafficTimer: 0.2,
+          coinTimer: 0.8,
+          pickupTimer: 5,
+          objects: [],
+          particles: [],
+          pointer: {
+            active: false,
+            id: -1
+          },
+          stats: {
+            rush: 1,
+            near: 0
+          }
+        };
+      }
+
+      function formatNumber(value) {
+        return Math.max(0, Math.floor(value)).toLocaleString("en-US");
+      }
+
+      function resize() {
+        dpr = Math.min(2.5, window.devicePixelRatio || 1);
+        width = Math.max(320, window.innerWidth);
+        height = Math.max(480, window.innerHeight);
+        canvas.width = Math.round(width * dpr);
+        canvas.height = Math.round(height * dpr);
+        canvas.style.width = `${width}px`;
+        canvas.style.height = `${height}px`;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        buildSkyline();
+      }
+
+      function buildSkyline() {
+        skyline = [];
+        let x = -30;
+        let seed = Math.floor(width * 13 + height * 7);
+        const random = () => {
+          seed = (seed * 1664525 + 1013904223) >>> 0;
+          return seed / 4294967296;
+        };
+        while (x < width + 60) {
+          const w = 22 + random() * 38;
+          skyline.push({
+            x,
+            width: w,
+            height: height * (0.09 + random() * 0.17),
+            light: random(),
+            color: random() > 0.55 ? "#151b22" : "#11151d"
+          });
+          x += w + 4 + random() * 8;
+        }
+      }
+
+      function updateHud() {
+        scoreText.textContent = formatNumber(state.score);
+        bestText.textContent = formatNumber(best);
+        comboText.textContent = `x${state.combo}`;
+        comboChip.classList.toggle("show", state.combo > 1 && state.mode === "playing");
+        boostButton.style.setProperty("--boost", clamp(state.boost, 0, 1).toFixed(3));
+        boostButton.disabled = state.mode !== "playing" || state.boost < 0.06;
+        menuBest.textContent = formatNumber(best);
+        menuCoins.textContent = formatNumber(state.coins);
+        menuRush.textContent = `x${state.stats.rush}`;
+      }
+
+      function setScreen(nextMode) {
+        startScreen.classList.toggle("hidden", nextMode !== "ready");
+        pauseScreen.classList.toggle("hidden", nextMode !== "paused");
+        endScreen.classList.toggle("hidden", nextMode !== "crashed");
+      }
+
+      function showFlash() {
+        flash.classList.add("on");
+        window.setTimeout(() => flash.classList.remove("on"), 40);
+      }
+
+      function haptic(pattern) {
+        if ("vibrate" in navigator) {
+          navigator.vibrate(pattern);
+        }
+      }
+
+      function ensureAudio() {
+        if (muted || audio) return;
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        audio = new AudioContext();
+      }
+
+      function beep(freq, length, type = "sine", gainValue = 0.04) {
+        if (muted) return;
+        ensureAudio();
+        if (!audio) return;
+        const osc = audio.createOscillator();
+        const gain = audio.createGain();
+        osc.type = type;
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.0001, audio.currentTime);
+        gain.gain.exponentialRampToValueAtTime(gainValue, audio.currentTime + 0.014);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + length);
+        osc.connect(gain).connect(audio.destination);
+        osc.start();
+        osc.stop(audio.currentTime + length + 0.02);
+      }
+
+      function crashSound() {
+        if (muted) return;
+        ensureAudio();
+        if (!audio) return;
+        beep(90, 0.24, "sawtooth", 0.08);
+        window.setTimeout(() => beep(55, 0.28, "square", 0.045), 80);
+      }
+
+      function startGame() {
+        ensureAudio();
+        state = makeInitialState("playing");
+        setScreen("playing");
+        showFlash();
+        beep(420, 0.07, "triangle", 0.035);
+        window.setTimeout(() => beep(620, 0.08, "triangle", 0.035), 70);
+        updateHud();
+      }
+
+      function pauseGame() {
+        if (state.mode !== "playing") return;
+        state.mode = "paused";
+        pauseScore.textContent = formatNumber(state.score);
+        pauseBest.textContent = formatNumber(best);
+        pauseCoins.textContent = formatNumber(state.coins);
+        setScreen("paused");
+        updateHud();
+      }
+
+      function resumeGame() {
+        if (state.mode !== "paused") return;
+        state.mode = "playing";
+        lastTime = performance.now();
+        setScreen("playing");
+        updateHud();
+      }
+
+      function endGame() {
+        if (state.mode === "crashed") return;
+        state.mode = "crashed";
+        state.shake = 24;
+        haptic([50, 40, 90]);
+        crashSound();
+        showFlash();
+        if (state.score > best) {
+          best = state.score;
+          localStorage.setItem(storeKey, String(best));
+        }
+        finalScore.textContent = formatNumber(state.score);
+        finalBest.textContent = formatNumber(best);
+        finalCoins.textContent = formatNumber(state.coins);
+        window.setTimeout(() => setScreen("crashed"), 280);
+        updateHud();
+      }
+
+      function resetBest() {
+        best = 0;
+        localStorage.removeItem(storeKey);
+        updateHud();
+        beep(220, 0.06, "triangle", 0.03);
+      }
+
+      function toggleSound() {
+        muted = !muted;
+        localStorage.setItem(mutedKey, String(muted));
+        soundButton.setAttribute("aria-label", muted ? "Sound off" : "Sound on");
+        soundButton.style.opacity = muted ? "0.52" : "1";
+        if (!muted) {
+          ensureAudio();
+          beep(540, 0.05, "triangle", 0.03);
+        }
+      }
+
+      function targetFromClientX(clientX) {
+        const bottom = project(1, 0);
+        const roadWidth = bottom.roadWidth * 0.74;
+        return clamp((clientX - bottom.center) / (roadWidth * 0.5), -1.12, 1.12);
+      }
+
+      function pointerDown(event) {
+        if (state.mode !== "playing") return;
+        state.pointer.active = true;
+        state.pointer.id = event.pointerId;
+        canvas.setPointerCapture(event.pointerId);
+        state.player.target = targetFromClientX(event.clientX);
+      }
+
+      function pointerMove(event) {
+        if (state.mode !== "playing") return;
+        if (!state.pointer.active || event.pointerId !== state.pointer.id) return;
+        state.player.target = targetFromClientX(event.clientX);
+      }
+
+      function pointerUp(event) {
+        if (event.pointerId !== state.pointer.id) return;
+        state.pointer.active = false;
+        state.pointer.id = -1;
+      }
+
+      function keyDown(event) {
+        if (event.code === "ArrowLeft" || event.code === "KeyA") {
+          state.player.keyboard = -1;
+        } else if (event.code === "ArrowRight" || event.code === "KeyD") {
+          state.player.keyboard = 1;
+        } else if (event.code === "Space") {
+          if (state.mode === "ready" || state.mode === "crashed") startGame();
+          else if (state.mode === "playing") state.boostHeld = true;
+        } else if (event.code === "Escape") {
+          if (state.mode === "playing") pauseGame();
+          else if (state.mode === "paused") resumeGame();
+        }
+      }
+
+      function keyUp(event) {
+        if (["ArrowLeft", "ArrowRight", "KeyA", "KeyD"].includes(event.code)) {
+          state.player.keyboard = 0;
+        }
+        if (event.code === "Space") {
+          state.boostHeld = false;
+        }
+      }
+
+      function roadCurveAt(depth) {
+        const t = state.distance * 0.0009;
+        const p = depth * depth;
+        return (Math.sin(t + depth * 1.6) * width * 0.13 + Math.sin(t * 1.7 + depth * 2.8) * width * 0.045) * p;
+      }
+
+      function project(depth, lane) {
+        const d = clamp(depth, 0, 1.16);
+        const p = Math.pow(d, 1.58);
+        const horizon = height * 0.165;
+        const roadHeight = height * 0.81;
+        const roadWidth = lerp(width * 0.34, width * 1.02, p);
+        const center = width * 0.5 + roadCurveAt(d);
+        return {
+          x: center + lane * roadWidth * 0.365,
+          y: horizon + p * roadHeight,
+          p,
+          center,
+          roadWidth,
+          left: center - roadWidth * 0.5,
+          right: center + roadWidth * 0.5
+        };
+      }
+
+      function spawnTraffic() {
+        const difficulty = 1 + Math.min(2.2, state.distance / 8500);
+        const lanes = laneSlots.slice();
+        const blockers = Math.random() < clamp(0.18 + difficulty * 0.08, 0.18, 0.48) ? 2 : 1;
+        for (let i = 0; i < blockers; i += 1) {
+          if (!lanes.length) break;
+          const index = Math.floor(Math.random() * lanes.length);
+          const lane = lanes.splice(index, 1)[0];
+          state.objects.push({
+            type: "traffic",
+            lane,
+            depth: -i * 0.075,
+            color: carColors[Math.floor(Math.random() * carColors.length)],
+            passed: false,
+            wobble: Math.random() * Math.PI * 2,
+            size: 0.92 + Math.random() * 0.24
+          });
+        }
+      }
+
+      function spawnCoins() {
+        const lane = laneSlots[Math.floor(Math.random() * laneSlots.length)];
+        const arc = Math.random() > 0.55 ? (Math.random() > 0.5 ? 0.15 : -0.15) : 0;
+        for (let i = 0; i < 6; i += 1) {
+          state.objects.push({
+            type: "coin",
+            lane: clamp(lane + Math.sin(i * 0.95) * arc, -0.82, 0.82),
+            depth: -i * 0.055,
+            spin: Math.random() * Math.PI * 2
+          });
+        }
+      }
+
+      function spawnPickup() {
+        state.objects.push({
+          type: "boost",
+          lane: laneSlots[Math.floor(Math.random() * laneSlots.length)],
+          depth: 0,
+          spin: Math.random() * Math.PI * 2
+        });
+      }
+
+      function burst(x, y, color, count, force) {
+        for (let i = 0; i < count; i += 1) {
+          const angle = Math.random() * Math.PI * 2;
+          const speed = (0.35 + Math.random() * 0.75) * force;
+          state.particles.push({
+            x,
+            y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed - force * 0.25,
+            life: 0.35 + Math.random() * 0.35,
+            max: 0.7,
+            color,
+            size: 1.5 + Math.random() * 3.2
+          });
+        }
+      }
+
+      function playerRect() {
+        const p = project(0.925, state.player.lane);
+        const carWidth = clamp(width * 0.145, 48, 78);
+        const carHeight = carWidth * 1.62;
+        return {
+          x: p.x - carWidth * 0.5,
+          y: height * 0.775 - carHeight * 0.5,
+          w: carWidth,
+          h: carHeight,
+          cx: p.x,
+          cy: height * 0.775
+        };
+      }
+
+      function objectRect(obj) {
+        const p = project(obj.depth, obj.lane);
+        const scale = 0.28 + p.p * 1.02;
+        if (obj.type === "traffic") {
+          const carWidth = clamp(width * 0.108 * scale * obj.size, 18, 76);
+          const carHeight = carWidth * 1.72;
+          return {
+            x: p.x - carWidth * 0.5,
+            y: p.y - carHeight * 0.52,
+            w: carWidth,
+            h: carHeight,
+            cx: p.x,
+            cy: p.y
+          };
+        }
+        const radius = clamp(width * 0.032 * scale, 8, 24);
+        return {
+          x: p.x - radius,
+          y: p.y - radius,
+          w: radius * 2,
+          h: radius * 2,
+          cx: p.x,
+          cy: p.y
+        };
+      }
+
+      function intersects(a, b, shrink = 0.18) {
+        const ax = a.x + a.w * shrink;
+        const ay = a.y + a.h * shrink;
+        const aw = a.w * (1 - shrink * 2);
+        const ah = a.h * (1 - shrink * 2);
+        const bx = b.x + b.w * shrink;
+        const by = b.y + b.h * shrink;
+        const bw = b.w * (1 - shrink * 2);
+        const bh = b.h * (1 - shrink * 2);
+        return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
+      }
+
+      function collectCoin(obj) {
+        state.coins += 1;
+        state.score += 45 * state.combo;
+        state.boost = clamp(state.boost + 0.035, 0, 1);
+        const r = objectRect(obj);
+        burst(r.cx, r.cy, "#ffd34f", 8, 130);
+        beep(760 + Math.min(420, state.combo * 35), 0.045, "triangle", 0.026);
+      }
+
+      function collectBoost(obj) {
+        state.boost = 1;
+        state.combo = Math.min(9, state.combo + 1);
+        state.comboClock = 2.6;
+        state.stats.rush = Math.max(state.stats.rush, state.combo);
+        const r = objectRect(obj);
+        burst(r.cx, r.cy, "#31d4ff", 18, 190);
+        showFlash();
+        haptic(22);
+        beep(1080, 0.12, "triangle", 0.045);
+      }
+
+      function nearMiss(rect) {
+        state.combo = Math.min(9, state.combo + 1);
+        state.comboClock = 2.2;
+        state.stats.near += 1;
+        state.stats.rush = Math.max(state.stats.rush, state.combo);
+        state.score += 120 * state.combo;
+        state.boost = clamp(state.boost + 0.1, 0, 1);
+        state.shake = Math.max(state.shake, 4);
+        burst(rect.cx, rect.cy, "#f8fafc", 7, 95);
+        haptic(12);
+        beep(520 + state.combo * 45, 0.05, "square", 0.022);
+      }
+
+      function update(dt) {
+        if (state.mode !== "playing") {
+          state.roadPulse += dt * 0.35;
+          return;
+        }
+
+        const difficulty = 1 + Math.min(2.7, state.distance / 9000);
+        const boosting = state.boostHeld && state.boost > 0.015;
+        const targetSpeed = (620 + difficulty * 120) * (boosting ? 1.55 : 1);
+        state.speed += (targetSpeed - state.speed) * (1 - Math.exp(-4.8 * dt));
+        state.distance += state.speed * dt;
+        state.roadPulse += state.speed * dt * 0.001;
+        state.score += (state.speed * dt * (0.03 + state.combo * 0.006));
+        state.boostFlash = boosting ? 1 : Math.max(0, state.boostFlash - dt * 3);
+
+        if (boosting) {
+          state.boost = Math.max(0, state.boost - dt * 0.22);
+          state.shake = Math.max(state.shake, 1.6);
+        } else {
+          state.boost = clamp(state.boost + dt * 0.008, 0, 1);
+        }
+
+        if (state.player.keyboard) {
+          state.player.target = clamp(state.player.target + state.player.keyboard * dt * 1.9, -1.12, 1.12);
+        }
+        const previousLane = state.player.lane;
+        state.player.lane += (state.player.target - state.player.lane) * (1 - Math.exp(-10.5 * dt));
+        state.player.lean = clamp((state.player.lane - previousLane) * 22, -1, 1);
+
+        const roadLimit = 1.06;
+        if (Math.abs(state.player.lane) > roadLimit) {
+          state.player.offroad += dt;
+          state.speed *= 1 - Math.min(0.33, dt * 1.6);
+          state.shake = Math.max(state.shake, 2.5);
+          if (state.player.offroad > 0.75) {
+            endGame();
+          }
+        } else {
+          state.player.offroad = Math.max(0, state.player.offroad - dt * 2);
+        }
+
+        state.comboClock -= dt;
+        if (state.comboClock <= 0 && state.combo > 1) {
+          state.combo -= 1;
+          state.comboClock = state.combo > 1 ? 1.6 : 0;
+        }
+
+        state.trafficTimer -= dt;
+        if (state.trafficTimer <= 0) {
+          spawnTraffic();
+          state.trafficTimer = clamp(0.9 - difficulty * 0.12, 0.36, 0.76) + Math.random() * 0.22;
+        }
+
+        state.coinTimer -= dt;
+        if (state.coinTimer <= 0) {
+          spawnCoins();
+          state.coinTimer = 0.95 + Math.random() * 0.95;
+        }
+
+        state.pickupTimer -= dt;
+        if (state.pickupTimer <= 0) {
+          spawnPickup();
+          state.pickupTimer = 5.5 + Math.random() * 4.4;
+        }
+
+        const player = playerRect();
+        const depthSpeed = state.speed * dt / 3600;
+        for (const obj of state.objects) {
+          obj.depth += depthSpeed * (obj.type === "traffic" ? 1.06 : 1);
+          if (obj.type !== "traffic") obj.spin += dt * 8;
+          if (obj.type === "traffic") obj.wobble += dt * 2.6;
+          if (obj.depth < 0.62 || obj.depth > 1.08) continue;
+          const rect = objectRect(obj);
+          if (obj.type === "traffic") {
+            if (intersects(player, rect, 0.24)) {
+              endGame();
+              break;
+            }
+            const lateralGap = Math.abs(player.cx - rect.cx);
+            const nearRange = (player.w + rect.w) * 0.72;
+            if (!obj.passed && obj.depth > 0.86 && lateralGap < nearRange && lateralGap > (player.w + rect.w) * 0.42) {
+              obj.passed = true;
+              nearMiss(rect);
+            }
+          } else if (intersects(player, rect, 0.08)) {
+            obj.collected = true;
+            if (obj.type === "coin") collectCoin(obj);
+            if (obj.type === "boost") collectBoost(obj);
+          }
+        }
+
+        state.objects = state.objects.filter((obj) => !obj.collected && obj.depth < 1.2);
+        for (const p of state.particles) {
+          p.x += p.vx * dt;
+          p.y += p.vy * dt;
+          p.vy += 220 * dt;
+          p.life -= dt;
+        }
+        state.particles = state.particles.filter((p) => p.life > 0);
+        state.shake = Math.max(0, state.shake - dt * 20);
+        updateHud();
+      }
+
+      function drawBackground() {
+        const sky = ctx.createLinearGradient(0, 0, 0, height);
+        sky.addColorStop(0, "#070910");
+        sky.addColorStop(0.42, "#12151d");
+        sky.addColorStop(0.78, "#0c1111");
+        sky.addColorStop(1, "#08090c");
+        ctx.fillStyle = sky;
+        ctx.fillRect(0, 0, width, height);
+
+        const moonX = width * 0.77 + Math.sin(state.roadPulse * 0.08) * 12;
+        const moonY = height * 0.09;
+        const glow = ctx.createRadialGradient(moonX, moonY, 2, moonX, moonY, width * 0.38);
+        glow.addColorStop(0, "rgba(49, 212, 255, 0.2)");
+        glow.addColorStop(1, "rgba(49, 212, 255, 0)");
+        ctx.fillStyle = glow;
+        ctx.fillRect(0, 0, width, height * 0.5);
+
+        ctx.save();
+        ctx.translate(Math.sin(state.distance * 0.0001) * 18, 0);
+        for (const b of skyline) {
+          const base = height * 0.205;
+          ctx.fillStyle = b.color;
+          ctx.fillRect(b.x, base - b.height, b.width, b.height);
+          if (b.width > 24) {
+            ctx.fillStyle = b.light > 0.5 ? "rgba(255, 211, 79, 0.36)" : "rgba(49, 212, 255, 0.28)";
+            for (let y = base - b.height + 12; y < base - 8; y += 16) {
+              if ((Math.floor((y + b.x) / 16) + Math.floor(state.roadPulse)) % 3 !== 0) {
+                ctx.fillRect(b.x + 7, y, Math.max(5, b.width - 14), 3);
+              }
+            }
+          }
+        }
+        ctx.restore();
+
+        const ground = ctx.createLinearGradient(0, height * 0.18, 0, height);
+        ground.addColorStop(0, "#14211b");
+        ground.addColorStop(0.45, "#152016");
+        ground.addColorStop(1, "#0f130d");
+        ctx.fillStyle = ground;
+        ctx.fillRect(0, height * 0.18, width, height);
+      }
+
+      function drawRoad() {
+        const strips = 68;
+        for (let i = 0; i < strips; i += 1) {
+          const d1 = i / strips;
+          const d2 = (i + 1) / strips;
+          const p1 = project(d1, 0);
+          const p2 = project(d2, 0);
+          const shade = i % 2 === 0 ? "#252a30" : "#22272d";
+          ctx.fillStyle = shade;
+          ctx.beginPath();
+          ctx.moveTo(p1.left, p1.y);
+          ctx.lineTo(p1.right, p1.y);
+          ctx.lineTo(p2.right, p2.y);
+          ctx.lineTo(p2.left, p2.y);
+          ctx.closePath();
+          ctx.fill();
+
+          const shoulder = Math.max(3, p2.roadWidth * 0.017);
+          ctx.fillStyle = (Math.floor(i + state.roadPulse * 3) % 2) ? "#f8fafc" : "#ff5d6c";
+          ctx.beginPath();
+          ctx.moveTo(p1.left, p1.y);
+          ctx.lineTo(p1.left + shoulder, p1.y);
+          ctx.lineTo(p2.left + shoulder, p2.y);
+          ctx.lineTo(p2.left, p2.y);
+          ctx.closePath();
+          ctx.fill();
+          ctx.beginPath();
+          ctx.moveTo(p1.right - shoulder, p1.y);
+          ctx.lineTo(p1.right, p1.y);
+          ctx.lineTo(p2.right, p2.y);
+          ctx.lineTo(p2.right - shoulder, p2.y);
+          ctx.closePath();
+          ctx.fill();
+        }
+
+        const gap = 0.115;
+        const phase = (state.distance * 0.00018) % gap;
+        for (let d = -gap + phase; d < 1; d += gap) {
+          const d1 = clamp(d, 0, 1);
+          const d2 = clamp(d + gap * 0.45, 0, 1);
+          if (d2 <= 0.015 || d1 >= 0.99) continue;
+          for (const lane of [-0.335, 0.335]) {
+            const a = project(d1, lane);
+            const b = project(d2, lane);
+            const w1 = Math.max(1.4, a.roadWidth * 0.006);
+            const w2 = Math.max(1.7, b.roadWidth * 0.006);
+            ctx.fillStyle = "rgba(248, 250, 252, 0.78)";
+            ctx.beginPath();
+            ctx.moveTo(a.x - w1, a.y);
+            ctx.lineTo(a.x + w1, a.y);
+            ctx.lineTo(b.x + w2, b.y);
+            ctx.lineTo(b.x - w2, b.y);
+            ctx.closePath();
+            ctx.fill();
+          }
+        }
+
+        const horizon = height * 0.165;
+        const bloom = ctx.createLinearGradient(0, horizon, 0, height);
+        bloom.addColorStop(0, "rgba(49, 212, 255, 0.16)");
+        bloom.addColorStop(0.35, "rgba(49, 212, 255, 0)");
+        bloom.addColorStop(1, "rgba(255, 211, 79, 0.08)");
+        ctx.fillStyle = bloom;
+        ctx.fillRect(0, horizon, width, height - horizon);
+      }
+
+      function roundedRect(x, y, w, h, r) {
+        const radius = Math.min(r, w * 0.5, h * 0.5);
+        ctx.beginPath();
+        ctx.moveTo(x + radius, y);
+        ctx.arcTo(x + w, y, x + w, y + h, radius);
+        ctx.arcTo(x + w, y + h, x, y + h, radius);
+        ctx.arcTo(x, y + h, x, y, radius);
+        ctx.arcTo(x, y, x + w, y, radius);
+        ctx.closePath();
+      }
+
+      function drawCar(rect, color, lean, isPlayer) {
+        const x = rect.x;
+        const y = rect.y;
+        const w = rect.w;
+        const h = rect.h;
+        const cx = rect.cx;
+        const nose = isPlayer ? -1 : 1;
+        const leanOffset = lean * w * 0.12;
+
+        ctx.save();
+        ctx.translate(cx, y + h * 0.5);
+        ctx.rotate(lean * 0.09);
+        ctx.translate(-cx + leanOffset, -(y + h * 0.5));
+
+        ctx.fillStyle = "rgba(0, 0, 0, 0.36)";
+        roundedRect(x + w * 0.08, y + h * 0.08, w * 0.84, h * 0.9, w * 0.2);
+        ctx.fill();
+
+        const body = ctx.createLinearGradient(x, y, x + w, y + h);
+        body.addColorStop(0, color);
+        body.addColorStop(0.48, "#f8fafc");
+        body.addColorStop(1, color);
+        ctx.fillStyle = body;
+        roundedRect(x, y, w, h, w * 0.18);
+        ctx.fill();
+
+        ctx.fillStyle = "rgba(0, 0, 0, 0.18)";
+        roundedRect(x + w * 0.13, y + h * 0.12, w * 0.74, h * 0.76, w * 0.12);
+        ctx.fill();
+
+        ctx.fillStyle = "#10161c";
+        roundedRect(x + w * 0.22, y + h * (isPlayer ? 0.18 : 0.52), w * 0.56, h * 0.24, w * 0.08);
+        ctx.fill();
+        ctx.fillStyle = "rgba(49, 212, 255, 0.48)";
+        roundedRect(x + w * 0.28, y + h * (isPlayer ? 0.22 : 0.56), w * 0.44, h * 0.08, w * 0.04);
+        ctx.fill();
+
+        ctx.fillStyle = "#0b0c10";
+        roundedRect(x - w * 0.08, y + h * 0.2, w * 0.16, h * 0.24, w * 0.05);
+        ctx.fill();
+        roundedRect(x + w * 0.92, y + h * 0.2, w * 0.16, h * 0.24, w * 0.05);
+        ctx.fill();
+        roundedRect(x - w * 0.08, y + h * 0.61, w * 0.16, h * 0.24, w * 0.05);
+        ctx.fill();
+        roundedRect(x + w * 0.92, y + h * 0.61, w * 0.16, h * 0.24, w * 0.05);
+        ctx.fill();
+
+        ctx.fillStyle = isPlayer ? "#fff6ca" : "#ff4660";
+        const lightY = y + (nose < 0 ? h * 0.03 : h * 0.88);
+        roundedRect(x + w * 0.16, lightY, w * 0.22, h * 0.055, w * 0.03);
+        ctx.fill();
+        roundedRect(x + w * 0.62, lightY, w * 0.22, h * 0.055, w * 0.03);
+        ctx.fill();
+
+        if (isPlayer && state.boostFlash > 0.05) {
+          const flame = ctx.createLinearGradient(cx, y + h * 0.82, cx, y + h * 1.42);
+          flame.addColorStop(0, "rgba(49, 212, 255, 0.9)");
+          flame.addColorStop(0.55, "rgba(255, 211, 79, 0.82)");
+          flame.addColorStop(1, "rgba(255, 93, 108, 0)");
+          ctx.fillStyle = flame;
+          ctx.beginPath();
+          ctx.moveTo(cx - w * 0.22, y + h * 0.86);
+          ctx.lineTo(cx, y + h * (1.18 + Math.sin(state.roadPulse * 22) * 0.07));
+          ctx.lineTo(cx + w * 0.22, y + h * 0.86);
+          ctx.closePath();
+          ctx.fill();
+        }
+
+        ctx.restore();
+      }
+
+      function drawCoin(obj) {
+        const rect = objectRect(obj);
+        const spin = Math.abs(Math.cos(obj.spin));
+        const rx = rect.w * (0.18 + spin * 0.32);
+        const ry = rect.h * 0.5;
+        ctx.save();
+        ctx.translate(rect.cx, rect.cy);
+        ctx.fillStyle = "rgba(0, 0, 0, 0.22)";
+        ctx.beginPath();
+        ctx.ellipse(0, ry * 0.7, rect.w * 0.42, rect.h * 0.16, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#ffd34f";
+        ctx.strokeStyle = "#fff6ca";
+        ctx.lineWidth = Math.max(1.2, rect.w * 0.08);
+        ctx.beginPath();
+        ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = "rgba(8, 10, 14, 0.28)";
+        ctx.fillRect(-rx * 0.12, -ry * 0.52, rx * 0.24, ry * 1.04);
+        ctx.restore();
+      }
+
+      function drawBoost(obj) {
+        const rect = objectRect(obj);
+        const r = rect.w * 0.72;
+        ctx.save();
+        ctx.translate(rect.cx, rect.cy);
+        ctx.rotate(obj.spin * 0.25);
+        const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 1.8);
+        glow.addColorStop(0, "rgba(49, 212, 255, 0.65)");
+        glow.addColorStop(1, "rgba(49, 212, 255, 0)");
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(0, 0, r * 1.8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#31d4ff";
+        ctx.strokeStyle = "#f8fafc";
+        ctx.lineWidth = Math.max(1.5, r * 0.12);
+        ctx.beginPath();
+        ctx.moveTo(r * 0.15, -r);
+        ctx.lineTo(-r * 0.65, r * 0.1);
+        ctx.lineTo(-r * 0.05, r * 0.08);
+        ctx.lineTo(-r * 0.22, r);
+        ctx.lineTo(r * 0.7, -r * 0.22);
+        ctx.lineTo(r * 0.06, -r * 0.18);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function drawObjects() {
+        const visible = state.objects
+          .filter((obj) => obj.depth > -0.06 && obj.depth < 1.12)
+          .sort((a, b) => a.depth - b.depth);
+        for (const obj of visible) {
+          if (obj.type === "traffic") {
+            const rect = objectRect(obj);
+            drawCar(rect, obj.color, Math.sin(obj.wobble) * 0.08, false);
+          } else if (obj.type === "coin") {
+            drawCoin(obj);
+          } else if (obj.type === "boost") {
+            drawBoost(obj);
+          }
+        }
+      }
+
+      function drawPlayer() {
+        const rect = playerRect();
+        const color = state.player.offroad > 0.08 ? "#ff5d6c" : "#31d4ff";
+        drawCar(rect, color, state.player.lean, true);
+      }
+
+      function drawParticles(dt) {
+        for (const p of state.particles) {
+          const alpha = clamp(p.life / p.max, 0, 1);
+          ctx.globalAlpha = alpha;
+          ctx.fillStyle = p.color;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size * alpha, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+      }
+
+      function drawSpeedLines() {
+        if (state.mode !== "playing") return;
+        const strength = clamp((state.speed - 720) / 550 + state.boostFlash * 0.5, 0, 1);
+        if (strength <= 0.02) return;
+        ctx.save();
+        ctx.globalAlpha = 0.18 * strength;
+        ctx.strokeStyle = "#f8fafc";
+        ctx.lineWidth = 1.2;
+        for (let i = 0; i < 22; i += 1) {
+          const x = ((i * 83 + state.distance * 0.21) % (width + 160)) - 80;
+          const y = ((i * 137 + state.distance * 0.45) % height);
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          ctx.lineTo(x - 28 * strength, y - 74 * strength);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      function drawVignette() {
+        const vignette = ctx.createRadialGradient(width * 0.5, height * 0.58, height * 0.12, width * 0.5, height * 0.58, height * 0.72);
+        vignette.addColorStop(0, "rgba(0, 0, 0, 0)");
+        vignette.addColorStop(1, "rgba(0, 0, 0, 0.44)");
+        ctx.fillStyle = vignette;
+        ctx.fillRect(0, 0, width, height);
+      }
+
+      function render(dt) {
+        ctx.save();
+        if (state.shake > 0 && !prefersReducedMotion) {
+          const amount = state.shake;
+          ctx.translate((Math.random() - 0.5) * amount, (Math.random() - 0.5) * amount);
+        }
+        drawBackground();
+        drawRoad();
+        drawObjects();
+        drawPlayer();
+        drawParticles(dt);
+        drawSpeedLines();
+        drawVignette();
+        ctx.restore();
+      }
+
+      function frame(now) {
+        const dt = Math.min(0.033, Math.max(0, (now - lastTime) / 1000 || 0));
+        lastTime = now;
+        update(dt);
+        render(dt);
+        animationId = requestAnimationFrame(frame);
+      }
+
+      function bind() {
+        window.addEventListener("resize", resize);
+        window.addEventListener("orientationchange", resize);
+        window.addEventListener("keydown", keyDown);
+        window.addEventListener("keyup", keyUp);
+        window.addEventListener("blur", pauseGame);
+        canvas.addEventListener("pointerdown", pointerDown);
+        canvas.addEventListener("pointermove", pointerMove);
+        canvas.addEventListener("pointerup", pointerUp);
+        canvas.addEventListener("pointercancel", pointerUp);
+        startButton.addEventListener("click", startGame);
+        restartButton.addEventListener("click", startGame);
+        resumeButton.addEventListener("click", resumeGame);
+        pauseButton.addEventListener("click", pauseGame);
+        soundButton.addEventListener("click", toggleSound);
+        resetButton.addEventListener("click", resetBest);
+        boostButton.addEventListener("pointerdown", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (state.mode !== "playing") return;
+          state.boostHeld = true;
+          boostButton.setPointerCapture(event.pointerId);
+        });
+        boostButton.addEventListener("pointerup", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          state.boostHeld = false;
+        });
+        boostButton.addEventListener("pointercancel", () => {
+          state.boostHeld = false;
+        });
+      }
+
+      resize();
+      bind();
+      soundButton.style.opacity = muted ? "0.52" : "1";
+      updateHud();
+      setScreen("ready");
+      lastTime = performance.now();
+      cancelAnimationFrame(animationId);
+      animationId = requestAnimationFrame(frame);
+    })();
+  </script>
+</body>
+</html>
